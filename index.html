@@ -1691,27 +1691,7 @@
     <textarea id="peer-21-note" class="field-textarea" rows="2" placeholder="Ghi lại 1 góp ý em sẽ dùng để sửa bài của mình..." oninput="savePeerFeedbackNote(this.value)"></textarea>
   </div>
 </div>
-        <div class="col-4 card frame-f2" style="display: flex; flex-direction: column; gap: 0.5rem;">
-          <div>
-            <h3 class="card-title" style="margin: 0 0 0.25rem; font-size: 1.08rem;">3. Không Gian Đám Mây Khối 12 & Phản biện 2-1</h3>
-            <p style="margin: 0 0 0.45rem; font-size: 0.82rem; color: var(--on-surface-variant);">
-              Viết đoạn văn (~150 chữ) trực tiếp lên Padlet chung. Sau đó chọn 2 bài của bạn khác lớp để góp ý 2-1 (2 khen, 1 đề xuất).
-            </p>
-          </div>
-
-          <!-- Mã nhúng Padlet Chuẩn hóa Cloud Sync -->
-          <!-- Mã nhúng Padlet Chuẩn hóa Cloud Sync -->
-          <div class="card-toned" style="padding: 0; border-color: var(--primary);">
-            <iframe src="https://padlet.com/embed/s025ind2csj6b17z44pz" frameborder="0" allow="camera;microphone;geolocation" style="width:100%; height:650px; display:block; padding:0; margin:0; border-radius: 4px;"></iframe>
-          </div>
-
-          <!-- Ô Tự điều chỉnh sau khi nhận phản biện 2-1 trên Padlet -->
-          <div class="card-toned" style="margin-top: 0.25rem; border-color: var(--positive);">
-            <label class="field-label" for="peer-21-note" style="color: var(--positive);">Tự điều chỉnh sau phản biện 2–1 từ Padlet</label>
-            <textarea id="peer-21-note" class="field-textarea" rows="2" placeholder="Ghi lại 1 góp ý em sẽ dùng để sửa bài của mình..." oninput="savePeerFeedbackNote(this.value)"></textarea>
-          </div>
-        </div>
-      </div>
+              </div>
       <div class="slide-footer">
         <span style="font-weight: 600; color: var(--on-surface-variant);">Dự án STEAM Ngữ văn 12 · GV Lê Thụy Hoài An – Trường THPT Thạnh Lộc (Cổng VietSchool &amp; Kho học liệu số TP.HCM)</span>
         <div class="chip-row">
@@ -3301,48 +3281,27 @@
   }
 
   function exportCompleteDossier() {
-  const st = document.getElementById(`export-status-msg`);
-  const content = [
-    buildPhase1Block(),
-    ``,
-    `[MẶT 6] TỰ ĐIỀU CHỈNH SAU PHẢN BIỆN ĐỒNG ĐẲNG 2–1:`,
-    state.peer21Note || `(Chưa ghi nhận)`,
-    ``,
-    `[MẶT 6] ĐOẠN VĂN NGHỊ LUẬN (~150 CHỮ):`,
-    state.essayText || `(Chưa ghi nhận bài viết)`,
-    ``,
-    `Kết quả Luyện tập Mặt 6: ${Object.keys(state.practiceAnswers).length}/7 câu đã trả lời.`
-  ].join(`\n`);
-  
-  triggerDownload(content, `text/plain`, `Ho_So_Giam_Tuyen_3D_Rubich_Thi_Ca.txt`);
-  
-  if (st) {
-    st.style.display = `block`;
-    st.style.color = `var(--positive)`;
-    st.textContent = `✓ Đã xuất Hồ sơ Giám tuyển Hoàn chỉnh (.txt) cả 6 mặt!`;
+    const st = document.getElementById(`export-status-msg`);
+    const content = [
+      buildPhase1Block(),
+      ``,
+      `[MẶT 6] TỰ ĐIỀU CHỈNH SAU PHẢN BIỆN ĐỒNG ĐẲNG 2–1:`,
+      state.peer21Note || `(Chưa ghi nhận)`,
+      ``,
+      `[MẶT 6] ĐOẠN VĂN NGHỊ LUẬN (~150 CHỮ):`,
+      state.essayText || `(Chưa ghi nhận bài viết)`,
+      ``,
+      `Kết quả Luyện tập Mặt 6: ${Object.keys(state.practiceAnswers).length}/7 câu đã trả lời.`
+    ].join(`\n`);
+    
+    triggerDownload(content, `text/plain`, `Ho_So_Giam_Tuyen_3D_Rubich_Thi_Ca.txt`);
+    
+    if (st) {
+      st.style.display = `block`;
+      st.style.color = `var(--positive)`;
+      st.textContent = `✓ Đã xuất Hồ sơ Giám tuyển Hoàn chỉnh (.txt) cả 6 mặt!`;
+    }
   }
-} {
-  const st = document.getElementById(`export-status-msg`);
-  const content = [
-    buildPhase1Block(),
-    ``,
-    `[MẶT 6] TỰ ĐIỀU CHỈNH SAU PHẢN BIỆN ĐỒNG ĐẲNG 2–1:`,
-    state.peer21Note || `(Chưa ghi nhận)`,
-    ``,
-    `[MẶT 6] ĐOẠN VĂN NGHỊ LUẬN (~150 CHỮ):`,
-    `(Bài viết của học sinh đã được nộp và lưu trữ an toàn trên bảng Padlet của lớp)`,
-    ``,
-    `Kết quả Luyện tập Mặt 6: ${Object.keys(state.practiceAnswers).length}/7 câu đã trả lời.`
-  ].join(`\n`);
-  
-  triggerDownload(content, `text/plain`, `Ho_So_Giam_Tuyen_3D_Rubich_Thi_Ca.txt`);
-  
-  if (st) {
-    st.style.display = `block`;
-    st.style.color = `var(--positive)`;
-    st.textContent = `✓ Đã xuất Hồ sơ Giám tuyển Hoàn chỉnh (.txt) cả 6 mặt!`;
-  }
-}
 
   /* ================= MODALS: GUIDE, PRE/POST TEST, RUBRIC, CSV 32 HS ================= */
   function openGuideModal() {
