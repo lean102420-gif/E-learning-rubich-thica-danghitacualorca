@@ -1248,7 +1248,7 @@
           <div id="tts-status" style="font-size: 0.85rem; color: var(--secondary); font-weight: 700;">
             Sẵn sàng. Bấm “🔊 Nghe đọc Tiếng Việt” trên bất kỳ thẻ lật nào.
           </div>
-          <button class="btn btn-sm" onclick="toggleMp3Drawer()">📁 Nạp MP3 thuyết minh (Tùy chọn GV)</button>
+          <button class="btn btn-primary" onclick="phatAmThanhBieuTuong('audio-bieutuong-1')">🔊 Nghe âm thanh gốc (Thẻ 1)</button>
         </div>
 
         <div class="tts-progress-track" style="margin-top: 0.45rem;">
@@ -1317,7 +1317,7 @@
                   Âm thanh bọt nước vừa trong trẻo vừa mong manh trước họng súng phát xít. Dù “không ai chôn cất”, tiếng đàn vẫn mọc lên tự nhiên, bất diệt như loài cỏ hoang.
                 </p>
               </div>
-              <button class="btn btn-primary" onclick="event.stopPropagation(); speakSymbol(1)">🔊 Nghe đọc Tiếng Việt</button>
+              <button class="btn btn-primary" onclick="event.stopPropagation(); phatAmThanhBieuTuong('audio-bieutuong-1')">🔊 Nghe giọng cô An</button>
             </div>
           </div>
         </div>
@@ -1345,7 +1345,7 @@
                   Từ sắc đỏ rực khát vọng cách tân nghệ thuật của người đấu sĩ trên đấu trường chữ nghĩa, tấm áo choàng biến thành cảnh tượng máu đổ kinh hoàng tại pháp trường Víznar năm 1936.
                 </p>
               </div>
-              <button class="btn btn-primary" onclick="event.stopPropagation(); speakSymbol(2)">🔊 Nghe đọc Tiếng Việt</button>
+              <button class="btn btn-primary" onclick="event.stopPropagation(); phatAmThanhBieuTuong('audio-bieutuong-2')">🔊 Nghe giọng cô An</button>
             </div>
           </div>
         </div>
@@ -1373,7 +1373,7 @@
                   Hình ảnh siêu thực kết tinh nỗi đau nhân thế thành viên ngọc nghệ thuật thanh khiết. Vũ trụ rỏ lệ khóc thương Lor-ca, biến cái chết hữu hạn thành ánh sáng vĩnh cửu.
                 </p>
               </div>
-              <button class="btn btn-primary" onclick="event.stopPropagation(); speakSymbol(3)">🔊 Nghe đọc Tiếng Việt</button>
+              <button class="btn btn-primary" onclick="event.stopPropagation(); phatAmThanhBieuTuong('audio-bieutuong-3')">🔊 Nghe giọng cô An</button>
             </div>
           </div>
         </div>
@@ -1402,7 +1402,7 @@
                   Sinh mệnh trần thế bị cắt ngang ở tuổi 38, nhưng trên dòng sông rộng vô cùng giữa sinh – tử, chiếc ghi-ta màu bạc hóa con thuyền ánh sáng đưa Lor-ca bình thản bước vào bất tử.
                 </p>
               </div>
-              <button class="btn btn-primary" onclick="event.stopPropagation(); speakSymbol(4)">🔊 Nghe đọc Tiếng Việt</button>
+              <button class="btn btn-primary" onclick="event.stopPropagation(); phatAmThanhBieuTuong('audio-bieutuong-4')">🔊 Nghe giọng cô An</button>
             </div>
           </div>
         </div>
@@ -3273,35 +3273,27 @@
   }
 
   function exportCompleteDossier() {
-    const wc = countWords(state.essayText);
-    const st = document.getElementById(`export-status-msg`);
-    if (wc < 30) {
-      if (st) {
-        st.style.display = `block`;
-        st.style.color = `var(--error)`;
-        st.textContent = `Hãy viết đoạn văn ở Xưởng Viết (tối thiểu 30 chữ, chuẩn 130–170 chữ) trước khi xuất Hồ sơ Hoàn chỉnh Nhịp 2.`;
-      }
-      return;
-    }
-    const content = [
-      buildPhase1Block(),
-      ``,
-      `[MẶT 6] TỰ ĐIỀU CHỈNH SAU PHẢN BIỆN ĐỒNG ĐẲNG 2–1:`,
-      state.peer21Note || `(Chưa ghi nhận)`,
-      ``,
-      `[MẶT 6] ĐOẠN VĂN NGHỊ LUẬN (~150 CHỮ) — ${state.essayTopic}:`,
-      `Số chữ: ${wc}`,
-      state.essayText.trim(),
-      ``,
-      `Kết quả Luyện tập Mặt 6: ${Object.keys(state.practiceAnswers).length}/7 câu đã trả lời.`
-    ].join(`\n`);
-    triggerDownload(content, `text/plain`, `Ho_So_Giam_Tuyen_3D_Rubich_Thi_Ca.txt`);
-    if (st) {
-      st.style.display = `block`;
-      st.style.color = `var(--positive)`;
-      st.textContent = `✓ Đã xuất Hồ sơ Giám tuyển Hoàn chỉnh (.txt) cả 6 mặt!`;
-    }
+  const st = document.getElementById(`export-status-msg`);
+  const content = [
+    buildPhase1Block(),
+    ``,
+    `[MẶT 6] TỰ ĐIỀU CHỈNH SAU PHẢN BIỆN ĐỒNG ĐẲNG 2–1:`,
+    state.peer21Note || `(Chưa ghi nhận)`,
+    ``,
+    `[MẶT 6] ĐOẠN VĂN NGHỊ LUẬN (~150 CHỮ):`,
+    `(Bài viết của học sinh đã được nộp và lưu trữ an toàn trên bảng Padlet của lớp)`,
+    ``,
+    `Kết quả Luyện tập Mặt 6: ${Object.keys(state.practiceAnswers).length}/7 câu đã trả lời.`
+  ].join(`\n`);
+  
+  triggerDownload(content, `text/plain`, `Ho_So_Giam_Tuyen_3D_Rubich_Thi_Ca.txt`);
+  
+  if (st) {
+    st.style.display = `block`;
+    st.style.color = `var(--positive)`;
+    st.textContent = `✓ Đã xuất Hồ sơ Giám tuyển Hoàn chỉnh (.txt) cả 6 mặt!`;
   }
+}
 
   /* ================= MODALS: GUIDE, PRE/POST TEST, RUBRIC, CSV 32 HS ================= */
   function openGuideModal() {
@@ -3580,6 +3572,46 @@
   }
 
   document.addEventListener(`DOMContentLoaded`, initApp);
-</script>
-</body>
+function phatAmThanhBieuTuong(idAmThanh) {
+    const danhSachAudio = [
+        'audio-bieutuong-1', 
+        'audio-bieutuong-2', 
+        'audio-bieutuong-3', 
+        'audio-bieutuong-4'
+    ];
+
+    // 1. Tắt các giọng đọc cũ nếu đang phát dở
+    danhSachAudio.forEach(function(id) {
+        let audio = document.getElementById(id);
+        if (audio) {
+            audio.pause();           
+            audio.currentTime = 0;   
+        }
+    });
+
+    // 2. Tự động bật tiếng đàn Ghi-ta Flamenco làm nhạc nền
+    if (typeof toggleFlamencoSolo === 'function' && typeof flamencoSoloPlaying !== 'undefined') {
+        if (!flamencoSoloPlaying) {
+            toggleFlamencoSolo(); 
+        }
+    }
+
+    // 3. Phát giọng đọc của cô An
+    let audioCanPhat = document.getElementById(idAmThanh);
+    if (audioCanPhat) {
+        audioCanPhat.play();
+        
+        // 4. Tự động tắt tiếng đàn khi cô đọc xong
+        audioCanPhat.onended = function() {
+            if (typeof toggleFlamencoSolo === 'function' && flamencoSoloPlaying) {
+                toggleFlamencoSolo();
+            }
+        };
+    }
+}</script>
+<!-- Cụm âm thanh đọc diễn cảm 4 biểu tượng Mặt 4 -->
+<audio id="audio-bieutuong-1" src="doc-bieu-tuong-1.mp3"></audio>
+<audio id="audio-bieutuong-2" src="doc-bieu-tuong-2.mp3"></audio>
+<audio id="audio-bieutuong-3" src="doc-bieu-tuong-3.mp3"></audio>
+<audio id="audio-bieutuong-4" src="doc-bieu-tuong-4.mp3"></audio></body>
 </html>
