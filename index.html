@@ -1719,12 +1719,12 @@
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; border-bottom: var(--hairline); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
       <div>
         <span id="assess-mode-badge" class="badge" style="color: var(--primary);">PRE-TEST XUẤT PHÁT</span>
-        <h2 id="assess-modal-title" class="card-title" style="margin: 0.25rem 0 0;">Đánh giá 4 Chỉ số (CS-01..04), Rubric 100đ &amp; Thống kê Tổng hợp Lớp</h2>
+        <h2 id="assess-modal-title" class="card-title" style="margin: 0.25rem 0 0;">Đánh giá 4 Chỉ số (CS-01..04), Rubric 100đ &amp; Thống kê Điểm Cá Nhân</h2>
       </div>
       <div class="chip-row">
         <button class="btn btn-sm" onclick="switchAssessTab('quiz')">1. Trắc nghiệm &amp; Tự luận (CS-01..04)</button>
         <button class="btn btn-sm" onclick="switchAssessTab('rubric')">2. Rubric 100 điểm</button>
-        <button class="btn btn-sm" onclick="switchAssessTab('export32')">3. Bảng tổng hợp Lớp</button>
+        <button class="btn btn-sm" onclick="switchAssessTab('export32')">3. Bảng điểm Cá nhân</button>
         <button class="btn btn-sm btn-danger" onclick="closeAssessmentModal()">✕ Đóng</button>
       </div>
     </div>
@@ -1757,7 +1757,7 @@
         Tổng hợp minh chứng học tập của học sinh.
       </p>
       <div class="chip-row" style="margin-bottom: 0.65rem;">
-        <button class="btn btn-primary" onclick="exportClassCSV32()">⬇ Xuất CSV Bảng điểm Lớp (.csv)</button>
+        <button class="btn btn-primary" onclick="exportClassCSV32()">⬇ Xuất CSV Điểm Cá nhân (.csv)</button>
         <button class="btn btn-danger" onclick="clearAllProgress(this)">🗑 Xóa dữ liệu phiên làm việc</button>
       </div>
       <div id="export32-preview-table" style="max-height: 280px; overflow-y: auto;"></div>
@@ -3442,22 +3442,15 @@
   }
 
   function build32StudentRows() {
-    const rows = [];
-    state.classBoard.forEach(function (post) {
-      const isMe = (post.stt === parseInt(state.studentStt, 10));
-      rows.push({
-        stt: post.stt,
-        name: post.name,
-        cls: post.cls,
-        wc: post.wc,
-        reviews: post.reviews ? post.reviews.length : 0,
-        preA: isMe && state.quizScores.pre !== null ? state.quizScores.pre : ``,
-        postA: isMe && state.quizScores.post !== null ? state.quizScores.post : ``,
-        rubric: isMe ? Object.values(state.rubricScores).reduce(function (a, b) { return a + b; }, 0) : ``
-      });
-    });
-    rows.sort(function(a, b) { return a.stt - b.stt; });
-    return rows;
+    const rubricTotal = Object.values(state.rubricScores).reduce(function (a, b) { return a + b; }, 0);
+    return [{
+      stt: parseInt(state.studentStt, 10) || 1,
+      name: state.studentName || '(Chưa nhập tên)',
+      cls: getResolvedClass(),
+      preA: state.quizScores.pre !== null ? state.quizScores.pre : 'Chưa làm',
+      postA: state.quizScores.post !== null ? state.quizScores.post : 'Chưa làm',
+      rubric: rubricTotal
+    }];
   }
 
   function renderExport32Preview() {
@@ -3466,9 +3459,9 @@
     const rows = build32StudentRows();
     box.innerHTML = `
       <table class="data-table">
-        <thead><tr><th>STT</th><th>Họ và tên</th><th>Lớp</th><th>Số chữ</th><th>Góp ý 2–1</th><th>Pre A</th><th>Post A</th><th>Rubric</th></tr></thead>
+        <thead><tr><th>STT</th><th>Họ và tên</th><th>Lớp</th><th>Pre-test (A)</th><th>Post-test (A)</th><th>Điểm Rubric</th></tr></thead>
         <tbody>${rows.map(function (r) {
-          return `<tr><td>${String(r.stt).padStart(2, `0`)}</td><td>${r.name}</td><td>${r.cls}</td><td>${r.wc}</td><td>${r.reviews}</td><td>${r.preA}</td><td>${r.postA}</td><td>${r.rubric}</td></tr>`;
+          return `<tr><td>${String(r.stt).padStart(2, `0`)}</td><td>${r.name}</td><td>${r.cls}</td><td>${r.preA}</td><td>${r.postA}</td><td><strong style="color:var(--primary);">${r.rubric}/100</strong></td></tr>`;
         }).join(``)}</tbody>
       </table>
     `;
@@ -3476,11 +3469,11 @@
 
   function exportClassCSV32() {
     const rows = build32StudentRows();
-    const header = `STT,Ho_va_ten,Lop,So_chu_doan_van,So_gop_y_2_1,Pre_test_Phan_A,Post_test_Phan_A,Rubric_100`;
+    const header = `STT,Ho_va_ten,Lop,Diem_Pre_test,Diem_Post_test,Diem_Rubric_100`;
     const body = rows.map(function (r) {
-      return `${r.stt},"${r.name}","${r.cls}",${r.wc},${r.reviews},${r.preA},${r.postA},${r.rubric}`;
+      return `${r.stt},"${r.name}","${r.cls}",${r.preA},${r.postA},${r.rubric}`;
     }).join(`\n`);
-    triggerDownload(`\uFEFF` + header + `\n` + body, `text/csv`, `bang_thong_ke_lop.csv`);
+    triggerDownload(`\uFEFF` + header + `\n` + body, `text/csv`, `Bang_Diem_Ca_Nhan_${state.studentName || 'HS'}.csv`);
   }
 
   function clearAllProgress(btn) {
