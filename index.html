@@ -7,7 +7,7 @@
   <meta name="design-style" content="nocturne">
   <title>Ru-bích Thi Ca Số 3D — Đàn Ghi Ta Của Lor-ca (Ngữ Văn 12)</title>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <script src="chart.umd.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js';document.head.appendChild(s);"></script>
   <style>
     :root {
       color-scheme: dark;
@@ -689,11 +689,9 @@
 <script>
  function startApp() {
     document.getElementById('splash-screen').style.display = 'none';
-    // Ép trình duyệt mở khóa bộ xử lý âm thanh ngay lập tức
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) {
-      if (!window.audioCtx) window.audioCtx = new AC();
-      window.audioCtx.resume();
+    // Mở khóa đúng bộ xử lý âm thanh của ứng dụng chính
+    if (typeof ensureAudioCtx === 'function') {
+      ensureAudioCtx();
     }
     // Tự động ghi nhận thời điểm vào bài và bắt đầu đếm thời gian học
     if (typeof state !== 'undefined' && typeof toggleStudyTimer === 'function') {
@@ -783,6 +781,10 @@
                   <label class="field-label" for="stu-stt">Mã HS / STT</label>
                   <input id="stu-stt" class="field-input" type="text" placeholder="VD: 12A4-01" oninput="updateStudentInfo()">
                 </div>
+              </div>
+              <div id="stu-class-custom-wrap" style="display: none;">
+                <label class="field-label" for="stu-class-custom">Nhập tên lớp của em</label>
+                <input id="stu-class-custom" class="field-input" type="text" placeholder="Ví dụ: 12A10" oninput="updateStudentInfo()">
               </div>
             </div>
           </div>
@@ -1718,11 +1720,11 @@
       <button class="btn btn-sm" onclick="closeGuideModal()">✕ Đóng</button>
     </div>
     <div style="display: grid; gap: 0.5rem; font-size: 0.88rem;">
-      <div class="card-toned"><strong>Chặng 1 (15 phút) — Khởi động &amp; Pre-test:</strong> Nhập hồ sơ cá nhân (Họ tên, Lớp, STT 1–32), bật đồng hồ 90:00, nghe Độc tấu Flamenco, xoay Ru-bích 3D và làm Pre-test CS-01..04.</div>
-      <div class="card-toned"><strong>Chặng 2 (35 phút) — Khai thác Mặt 1 → Mặt 5:</strong> Hoàn thành 5 mảnh dữ liệu đầu ra (Bối cảnh 1936, Bảng 3 tầng Hz vs nm, Sóng cảm xúc 31 dòng, 04 thẻ lật + đọc Tiếng Việt đa nguồn, Phiếu số 03 phản biện AI).</div>
-      <div class="card-toned"><strong>Chặng 3 (15 phút) — Báo cáo Nhịp 1 &amp; Phản biện 2–1:</strong> Xuất Báo cáo Mặt 1–5 và góp ý đồng đẳng (2 điểm thuyết phục – 1 góp ý điều chỉnh) trên Bảng Đám Mây Khối 12.</div>
-      <div class="card-toned"><strong>Chặng 4 (15 phút) — Đài Liên văn bản &amp; Xưởng Viết Mặt 6:</strong> Đối chiếu <em>Cảm hoài – Tây Tiến – Lor-ca</em>, luyện tập 7 câu, viết đoạn ~150 chữ, tự điều chỉnh sau góp ý 2–1 và xuất Hồ sơ Hoàn chỉnh (.txt).</div>
-      <div class="card-toned"><strong>Chặng 5 (10 phút) — Post-test &amp; Rubric 100 điểm:</strong> Làm Post-test (7 câu trắc nghiệm + 2 câu tự luận ngắn), tự chấm Rubric và xuất bảng tổng hợp CSV lớp 32 học sinh.</div>
+      <div class="card-toned"><strong>Chặng 1 (15 phút) — Khởi động &amp; Pre-test:</strong> Nhập hồ sơ cá nhân (Họ tên, Lớp, Mã HS/STT), khởi chạy đồng hồ 90:00, nghe Độc tấu Flamenco, xoay Ru-bích 3D và làm Pre-test (6 câu trắc nghiệm + 1 câu tự luận ngắn).</div>
+      <div class="card-toned"><strong>Chặng 2 (35 phút) — Khai thác Mặt 1 → Mặt 5:</strong> Hoàn thành 5 mảnh dữ liệu đầu ra (Bối cảnh 1936, Khóa lỗi ngụy khoa học Hz vs. nm, Sóng cảm xúc 31 dòng, 04 thẻ lật + giọng đọc diễn cảm, Phiếu số 03 phản biện AI).</div>
+      <div class="card-toned"><strong>Chặng 3 (15 phút) — Báo cáo &amp; Phản biện 2–1 trên Padlet:</strong> Chia sẻ bài viết lên Không gian Đám mây Padlet nhúng trực tiếp tại Mặt 6 và thực hiện phản biện đồng đẳng 2–1 (2 điểm thuyết phục – 1 góp ý điều chỉnh) cho bài của bạn học.</div>
+      <div class="card-toned"><strong>Chặng 4 (15 phút) — Đài Liên văn bản &amp; Xưởng Viết Mặt 6:</strong> Đối chiếu <em>Cảm hoài – Tây Tiến – Lor-ca</em>, làm Luyện tập 7 câu, viết đoạn văn ~150 chữ (130–170 chữ) kèm tự điều chỉnh sau góp ý 2–1.</div>
+      <div class="card-toned"><strong>Chặng 5 (10 phút) — Post-test, Rubric 100đ &amp; Xuất Hồ sơ:</strong> Làm Post-test (6 câu trắc nghiệm + 1 câu tự luận ngắn), tự chấm Rubric 100 điểm, xuất Hồ sơ Giám tuyển Hoàn chỉnh (.txt) kèm Nhật ký thời gian &amp; Bảng điểm Cá nhân (tùy chọn xuất thêm CSV Cá nhân).</div>
     </div>
   </div>
 </div>
@@ -2752,7 +2754,11 @@
 
   function setTTSMode(mode) { state.ttsMode = mode; persistState(); }
   function selectVietnameseVoice(uri) { state.ttsVoiceUri = uri; persistState(); }
-  function setTTSRate(rate) { state.ttsRate = parseFloat(rate) || 0.96; persistState(); }
+  function setTTSRate(rate) {
+    state.ttsRate = parseFloat(rate) || 0.96;
+    if (currentMp3Audio) currentMp3Audio.playbackRate = state.ttsRate;
+    persistState();
+  }
 
   function renderKaraokeSegments(text, activeIdx) {
     const box = document.getElementById(`tts-karaoke-box`);
@@ -2767,10 +2773,17 @@
   function stopVietnameseTTS() {
     clearInterval(karaokeTimer);
     if (`speechSynthesis` in window) window.speechSynthesis.cancel();
+    [`audio-bieutuong-1`, `audio-bieutuong-2`, `audio-bieutuong-3`, `audio-bieutuong-4`].forEach(function (id) {
+      const a = document.getElementById(id);
+      if (a) { a.pause(); a.currentTime = 0; }
+    });
     if (currentMp3Audio) {
       currentMp3Audio.pause();
       currentMp3Audio.currentTime = 0;
       currentMp3Audio = null;
+    }
+    if (typeof flamencoSoloPlaying !== `undefined` && flamencoSoloPlaying) {
+      stopAllAudio();
     }
     ttsPaused = false;
     const pb = document.getElementById(`btn-tts-pause`);
@@ -2784,8 +2797,17 @@
   function togglePauseTTS() {
     const pb = document.getElementById(`btn-tts-pause`);
     if (currentMp3Audio) {
-      if (currentMp3Audio.paused) { currentMp3Audio.play(); ttsPaused = false; }
-      else { currentMp3Audio.pause(); ttsPaused = true; }
+      if (currentMp3Audio.paused) {
+        currentMp3Audio.play().catch(function () {});
+        if (currentMp3Audio.id && currentMp3Audio.id.indexOf(`audio-bieutuong-`) === 0 && !flamencoSoloPlaying) {
+          toggleFlamencoSolo();
+        }
+        ttsPaused = false;
+      } else {
+        currentMp3Audio.pause();
+        if (flamencoSoloPlaying) stopAllAudio();
+        ttsPaused = true;
+      }
     } else if (`speechSynthesis` in window && window.speechSynthesis.speaking) {
       if (ttsPaused) { window.speechSynthesis.resume(); ttsPaused = false; }
       else { window.speechSynthesis.pause(); ttsPaused = true; }
@@ -2794,7 +2816,7 @@
   }
 
   function replayCurrentTTS() {
-    speakSymbol(lastTtsCard);
+    phatAmThanhBieuTuong(`audio-bieutuong-${lastTtsCard || 1}`);
   }
 
   function speakSymbol(cardNum) {
@@ -3712,7 +3734,11 @@ function gradeAssessmentQuiz() {
     renderTimer();
     selectMapLocation(`granada`);
     selectTimeline(0);
-    triggerGuitarMotif(0);
+    const m0 = GUITAR_MOTIFS[0];
+    const layerBox0 = document.getElementById('guitar-layer-readout');
+    if (layerBox0 && m0) {
+      layerBox0.innerHTML = `<div><strong style="color: var(--primary);">Tầng 1 (Vật lý):</strong> ${m0.phys}</div><div style="margin-top: 0.2rem;"><strong style="color: var(--secondary);">Tầng 2 (Văn bản):</strong> <em>${m0.text}</em></div><div style="margin-top: 0.2rem;"><strong style="color: var(--positive);">Tầng 3 (Thẩm mỹ):</strong> ${m0.aes}</div>`;
+    }
     setLexFilter(state.lexFilter || `ALL`);
     selectAiCase(state.aiCase || 0);
     selectPair(state.intertextPair || 0);
@@ -3733,40 +3759,67 @@ function gradeAssessmentQuiz() {
 
   document.addEventListener(`DOMContentLoaded`, initApp);
 function phatAmThanhBieuTuong(idAmThanh) {
-    const danhSachAudio = [
-        'audio-bieutuong-1', 
-        'audio-bieutuong-2', 
-        'audio-bieutuong-3', 
-        'audio-bieutuong-4'
-    ];
+    const cardNum = parseInt(String(idAmThanh).replace(/\D/g, ''), 10) || 1;
+    lastTtsCard = cardNum;
+    stopVietnameseTTS();
 
-    // 1. Tắt các giọng đọc cũ nếu đang phát dở
-    danhSachAudio.forEach(function(id) {
-        let audio = document.getElementById(id);
-        if (audio) {
-            audio.pause();           
-            audio.currentTime = 0;   
-        }
-    });
+    const audioCanPhat = document.getElementById(idAmThanh);
+    const status = document.getElementById('tts-status');
+    const guide = document.getElementById('tts-fallback-guide');
+    const fill = document.getElementById('tts-progress-fill');
+    const text = TTS_SCRIPTS[cardNum] || '';
+    const segs = renderKaraokeSegments(text, 0) || [text];
 
-    // 2. Tự động bật tiếng đàn Ghi-ta Flamenco làm nhạc nền
-    if (typeof toggleFlamencoSolo === 'function' && typeof flamencoSoloPlaying !== 'undefined') {
-        if (!flamencoSoloPlaying) {
-            toggleFlamencoSolo(); 
-        }
+    if (!audioCanPhat) {
+        speakSymbol(cardNum);
+        return;
     }
 
-    // 3. Phát giọng đọc của cô An
-    let audioCanPhat = document.getElementById(idAmThanh);
-    if (audioCanPhat) {
-        audioCanPhat.play();
-        
-        // 4. Tự động tắt tiếng đàn khi cô đọc xong
-        audioCanPhat.onended = function() {
-            if (typeof toggleFlamencoSolo === 'function' && flamencoSoloPlaying) {
-                toggleFlamencoSolo();
+    if (guide) guide.style.display = 'none';
+    currentMp3Audio = audioCanPhat;
+    audioCanPhat.currentTime = 0;
+    audioCanPhat.playbackRate = state.ttsRate || 0.96;
+
+    audioCanPhat.ontimeupdate = function () {
+        if (audioCanPhat.duration && fill) {
+            const ratio = audioCanPhat.currentTime / audioCanPhat.duration;
+            fill.style.width = `${Math.min(100, ratio * 100)}%`;
+            const activeSeg = Math.min(segs.length - 1, Math.floor(ratio * segs.length));
+            renderKaraokeSegments(text, activeSeg);
+        }
+    };
+
+    audioCanPhat.onended = function () {
+        if (fill) fill.style.width = '100%';
+        if (status) status.textContent = `✓ Đã phát xong giọng đọc diễn cảm — Thẻ 0${cardNum}.`;
+        currentMp3Audio = null;
+        if (typeof flamencoSoloPlaying !== 'undefined' && flamencoSoloPlaying) {
+            stopAllAudio();
+        }
+    };
+
+    audioCanPhat.onerror = function () {
+        currentMp3Audio = null;
+        if (typeof flamencoSoloPlaying !== 'undefined' && flamencoSoloPlaying) {
+            stopAllAudio();
+        }
+        speakSymbol(cardNum);
+    };
+
+    if (typeof toggleFlamencoSolo === 'function' && typeof flamencoSoloPlaying !== 'undefined' && !flamencoSoloPlaying) {
+        toggleFlamencoSolo();
+    }
+
+    if (status) status.textContent = `🔊 Đang phát giọng đọc diễn cảm lồng nhạc Flamenco — Thẻ 0${cardNum}`;
+    const playPromise = audioCanPhat.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch(function () {
+            currentMp3Audio = null;
+            if (typeof flamencoSoloPlaying !== 'undefined' && flamencoSoloPlaying) {
+                stopAllAudio();
             }
-        };
+            speakSymbol(cardNum);
+        });
     }
 }</script>
 <!-- Cụm âm thanh đọc diễn cảm 4 biểu tượng Mặt 4 -->
