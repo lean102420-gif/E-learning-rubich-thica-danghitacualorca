@@ -687,13 +687,21 @@
   </button>
 </div>
 <script>
-  function startApp() {
+ function startApp() {
     document.getElementById('splash-screen').style.display = 'none';
     // Ép trình duyệt mở khóa bộ xử lý âm thanh ngay lập tức
     const AC = window.AudioContext || window.webkitAudioContext;
     if (AC) {
       if (!window.audioCtx) window.audioCtx = new AC();
       window.audioCtx.resume();
+    }
+    // Tự động ghi nhận thời điểm vào bài và bắt đầu đếm thời gian học
+    if (typeof state !== 'undefined' && typeof toggleStudyTimer === 'function') {
+      if (!state.lessonEnteredAt) {
+        state.lessonEnteredAt = new Date().toLocaleString('vi-VN');
+      }
+      state.timerRunning = false;
+      toggleStudyTimer();
     }
   }
 </script>
@@ -1636,7 +1644,7 @@
           </div>
 
           <div class="card-toned" style="border-left: 4px solid var(--positive); font-size: 0.82rem;">
-            <strong>Xuất Hồ sơ Giám tuyển 2 Nhịp (.txt):</strong>
+            <strong>Xuất Hồ sơ Giám tuyển (Kèm Thời gian học &amp; Bảng điểm Cá nhân):</strong>
             <div class="chip-row" style="margin-top: 0.35rem;">
               <button class="btn btn-sm btn-secondary" onclick="exportPhase1Dossier()">⬇ Nhịp 1 (Mặt 1–5)</button>
               <button class="btn btn-sm btn-primary" onclick="exportCompleteDossier()">⬇ Nhịp 2 (Hồ sơ Hoàn chỉnh)</button>
@@ -1743,7 +1751,7 @@
       </div>
       <div id="quiz-questions-container" style="display: grid; gap: 0.65rem;"></div>
       <div class="chip-row" style="margin-top: 0.75rem;">
-        <button class="btn btn-primary" onclick="gradeAssessmentQuiz()">✓ Chấm điểm Phần A (7,0đ) &amp; Lưu Phần B (3,0đ)</button>
+        <button class="btn btn-primary" onclick="gradeAssessmentQuiz()">✓ Chấm điểm Phần A (6 câu trắc nghiệm) &amp; Lưu Phần B (Tự luận)</button>
         <span id="quiz-result-summary" class="badge" style="color: var(--positive);">Chưa chấm</span>
       </div>
     </div>
@@ -2014,6 +2022,10 @@
     studentStt: ``,
     timerSeconds: 5400,
     timerRunning: false,
+    lessonEnteredAt: ``,
+    timerStartedAt: ``,
+    studiedSeconds: 0,
+    timerResetCount: 0,
     autoSpin: true,
     rotX: -18,
     rotY: -32,
@@ -2217,28 +2229,36 @@
   function toggleStudyTimer() {
     const btn = document.getElementById(`btn-timer-toggle`);
     state.timerRunning = !state.timerRunning;
+    if (state.timerRunning && !state.timerStartedAt) {
+      state.timerStartedAt = new Date().toLocaleString(`vi-VN`);
+    }
     if (btn) btn.textContent = state.timerRunning ? `Tạm dừng` : `Tiếp tục`;
     clearInterval(timerInterval);
     if (state.timerRunning) {
       timerInterval = setInterval(function () {
+        state.studiedSeconds = (state.studiedSeconds || 0) + 1;
         if (state.timerSeconds > 0) {
           state.timerSeconds--;
           renderTimer();
-        } else {
-          state.timerRunning = false;
-          clearInterval(timerInterval);
+        }
+        if (state.studiedSeconds % 10 === 0) {
+          persistState();
         }
       }, 1000);
+    } else {
+      persistState();
     }
   }
 
   function resetStudyTimer() {
     state.timerRunning = false;
     state.timerSeconds = 5400;
+    state.timerResetCount = (state.timerResetCount || 0) + 1;
     clearInterval(timerInterval);
     const btn = document.getElementById(`btn-timer-toggle`);
     if (btn) btn.textContent = `Bắt đầu`;
     renderTimer();
+    persistState();
   }
 
   /* ================= FACE 1: MAP & TIMELINE ================= */
@@ -3227,43 +3247,150 @@
   }
 
   /* ================= 2-STEP DOSSIER EXPORT (.txt) ================= */
+  /* ================= 2-STEP DOSSIER EXPORT (.txt) ================= */
+  function formatDurationVi(totalSec) {
+    const sec = Math.max(0, Math.floor(totalSec || 0));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${h} giờ ${String(m).padStart(2, '0')} phút ${String(s).padStart(2, '0')} giây`;
+    return `${String(m).padStart(2, '0')} phút ${String(s).padStart(2, '0')} giây`;
+  }
+
+  function evaluateStudySeriousness(totalSec) {
+    const mins = (totalSec || 0) / 60;
+    if (mins < 15) return `Cần lưu ý (Thời gian thực học dưới 15 phút — thao tác quá nhanh, GV cần kiểm tra tính nghiêm túc)`;
+    if (mins < 45) return `Khá nghiêm túc (Thời gian thực học từ 15–45 phút)`;
+    return `Nghiêm túc (Đảm bảo thời lượng tự học E-learning từ 45 phút trở lên)`;
+  }
+
+  function computeQuizAutoScore(phase) {
+    const list = phase === 'pre' ? PRE_TEST_QS : POST_TEST_QS;
+    const ansMap = (state.quizAnswers && state.quizAnswers[phase]) || {};
+    let totalMcq = 0, answered = 0, correct = 0;
+    list.forEach(function (q) {
+      if (q.type === 'mcq') {
+        totalMcq++;
+        if (ansMap[q.id] !== undefined) {
+          answered++;
+          if (ansMap[q.id] === q.ans) correct++;
+        }
+      }
+    });
+    return { correct: correct, answered: answered, totalMcq: totalMcq };
+  }
+
+  function computeM6PracticeScore() {
+    let answered = 0, correct = 0;
+    M6_PRACTICE_QS.forEach(function (q, i) {
+      if (state.practiceAnswers[i] !== undefined) {
+        answered++;
+        if (state.practiceAnswers[i] === q.ans) correct++;
+      }
+    });
+    return { correct: correct, answered: answered, total: M6_PRACTICE_QS.length };
+  }
+
+  function sanitizeFilenamePart(str) {
+    return (str || 'HS')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'HS';
+  }
+
+  function buildTimeTrackingBlock() {
+    const studied = state.studiedSeconds || (5400 - (state.timerSeconds || 5400));
+    const exportTime = new Date().toLocaleString('vi-VN');
+    return [
+      `================ 1. NHẬT KÝ THỜI GIAN HỌC TẬP ================`,
+      `- Thời điểm vào bài học     : ${state.lessonEnteredAt || '(Chưa ghi nhận)'}`,
+      `- Thời điểm bắt đầu bấm giờ : ${state.timerStartedAt || '(Chưa bấm đồng hồ)'}`,
+      `- Thời điểm xuất hồ sơ      : ${exportTime}`,
+      `- Tổng thời gian thực học   : ${formatDurationVi(studied)}`,
+      `- Đồng hồ 90 phút còn lại   : ${formatDurationVi(state.timerSeconds)}`,
+      `- Số lần đặt lại đồng hồ    : ${state.timerResetCount || 0} lần`,
+      `- Đánh giá mức độ nghiêm túc: ${evaluateStudySeriousness(studied)}`
+    ].join('\n');
+  }
+
+  function buildScoreSummaryBlock() {
+    const pre = computeQuizAutoScore('pre');
+    const post = computeQuizAutoScore('post');
+    const m6 = computeM6PracticeScore();
+    const r = state.rubricScores || { r1: 0, r2: 0, r3: 0, r4: 0 };
+    const rubricTotal = (r.r1 || 0) + (r.r2 || 0) + (r.r3 || 0) + (r.r4 || 0);
+    const diff = post.correct - pre.correct;
+    const delta = (pre.answered > 0 && post.answered > 0)
+      ? `${diff >= 0 ? '+' : ''}${diff} câu`
+      : 'Chưa đủ dữ liệu so sánh';
+    const preEssay = (state.quizEssays && state.quizEssays.pre && state.quizEssays.pre.pre4) || '(Chưa trả lời)';
+    const postEssay = (state.quizEssays && state.quizEssays.post && state.quizEssays.post.post4) || '(Chưa trả lời)';
+    const m2Status = state.pseudoChoice === 'B'
+      ? 'ĐẠT (Chọn đúng phương án B)'
+      : (state.pseudoChoice ? `CHƯA ĐẠT (Chọn phương án ${state.pseudoChoice})` : 'Chưa làm');
+
+    return [
+      `================ 2. BẢNG ĐIỂM CÁ NHÂN TỔNG HỢP ================`,
+      `- Pre-test đầu giờ (Trắc nghiệm) : ${pre.answered > 0 ? `${pre.correct} / ${pre.totalMcq} câu đúng` : 'Chưa làm'}`,
+      `  + Tự luận ngắn Pre-test (câu 4): ${preEssay}`,
+      `- Mặt 2 (Khóa lỗi ngụy khoa học) : ${m2Status}`,
+      `- Mặt 6 (Luyện tập 7 câu)        : ${m6.correct} / ${m6.total} câu đúng (đã chọn ${m6.answered}/${m6.total})`,
+      `- Post-test cuối giờ (Trắc nghiệm): ${post.answered > 0 ? `${post.correct} / ${post.totalMcq} câu đúng` : 'Chưa làm'}`,
+      `  + Tự luận ngắn Post-test (câu 4): ${postEssay}`,
+      `- Mức tăng trưởng (Post - Pre)   : ${delta}`,
+      `- Rubric tự đánh giá (Thang 100) : ${rubricTotal} / 100 điểm`,
+      `  + TC1 (Thi pháp & 31 dòng thơ) : ${r.r1 || 0}/25`,
+      `  + TC2 (Phân tầng 3 lớp & Toán) : ${r.r2 || 0}/25`,
+      `  + TC3 (Phản biện AI - Phiếu 03): ${r.r3 || 0}/25`,
+      `  + TC4 (Liên VB, Viết & 2-1)    : ${r.r4 || 0}/25`
+    ].join('\n');
+  }
+
   function buildPhase1Block() {
     return [
+      `===============================================================`,
       `HỒ SƠ GIÁM TUYỂN THI CA SỐ 3D — ĐÀN GHI TA CỦA LOR-CA (THANH THẢO)`,
-      `Học sinh: ${state.studentName || `(Chưa nhập)`} | Lớp: ${getResolvedClass()} | STT: ${state.studentStt || `--`}`,
-      `------------------------------------------------------------`,
+      `===============================================================`,
+      `Học sinh: ${state.studentName || '(Chưa nhập)'} | Lớp: ${getResolvedClass()} | Mã HS/STT: ${state.studentStt || '--'}`,
+      ``,
+      buildTimeTrackingBlock(),
+      ``,
+      buildScoreSummaryBlock(),
+      ``,
+      `================ 3. NỘI DUNG LÀM BÀI 6 MẶT ================`,
       `[MẶT 1] BỐI CẢNH TÂY BAN NHA 1936:`,
       state.reflections.m1 || `(Chưa ghi nhận)`,
       ``,
       `[MẶT 2] PHÂN TẦNG 3 LỚP & KHÓA LỖI NGỤY KHOA HỌC:`,
-      `Phương án đã chọn: ${state.pseudoChoice || `(Chưa chọn)`}`,
+      `Phương án đã chọn: ${state.pseudoChoice || '(Chưa chọn)'}`,
       ``,
       `[MẶT 3] ĐỊNH LƯỢNG 31 DÒNG & SÓNG CẢM XÚC 6 KHỔ:`,
-      `Tọa độ sóng cá nhân: [${state.waveValues.join(`, `)}]`,
-      `Lý giải đỉnh Khổ 3: ${state.reflections.m3 || `(Chưa ghi nhận)`}`,
+      `Tọa độ sóng cá nhân: [${state.waveValues.join(', ')}]`,
+      `Lý giải đỉnh Khổ 3: ${state.reflections.m3 || '(Chưa ghi nhận)'}`,
       ``,
       `[MẶT 4] GIẢI MÃ 02 BIỂU TƯỢNG HẠT NHÂN:`,
       state.reflections.m4 || `(Chưa ghi nhận)`,
       ``,
       `[MẶT 5] PHIẾU HỌC TẬP SỐ 03 — PHẢN BIỆN AI:`,
       state.aiLogs.length ? state.aiLogs.map(function (l, i) {
-        return `  #${i + 1} (${l.role}): ${l.flaw} -> ${l.decision}`;
-      }).join(`\n`) : `  (Chưa có bản ghi Phiếu số 03)`
-    ].join(`\n`);
+        return `  #${i + 1} (${l.role} | ${l.time}):\n    - Câu lệnh (Prompt): ${l.prompt || '(Không ghi)'}\n    - Lập luận bác bỏ: ${l.flaw}\n    - Quyết định giám tuyển: ${l.decision}`;
+      }).join('\n') : `  (Chưa có bản ghi Phiếu số 03)`
+    ].join('\n');
   }
 
   function triggerDownload(content, contentType, filename) {
-    if (window.notebookAppApi && typeof window.notebookAppApi.triggerFileDownload === `function`) {
+    if (window.notebookAppApi && typeof window.notebookAppApi.triggerFileDownload === 'function') {
       window.notebookAppApi.triggerFileDownload({
         content: content,
         contentType: contentType,
-        encoding: `UTF-8`,
+        encoding: 'UTF-8',
         filename: filename
       });
     } else {
       const blob = new Blob([content], { type: `${contentType};charset=utf-8` });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement(`a`);
+      const a = document.createElement('a');
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
@@ -3274,32 +3401,42 @@
   }
 
   function exportPhase1Dossier() {
-    const content = buildPhase1Block() + `\n\n[NHỊP 1: BÁO CÁO DỮ LIỆU MẶT 1–5 ĐỂ PHẢN BIỆN ĐỒNG ĐẲNG 2–1]`;
-    triggerDownload(content, `text/plain`, `Bao_Cao_Nhip_1_Mat_1_5.txt`);
-    const st = document.getElementById(`export-status-msg`);
-    if (st) { st.style.display = `block`; st.textContent = `✓ Đã xuất Báo cáo Nhịp 1 (Mặt 1–5).`; }
+    const cls = sanitizeFilenamePart(getResolvedClass());
+    const name = sanitizeFilenamePart(state.studentName);
+    const content = buildPhase1Block() + `\n\n[NHỊP 1: BÁO CÁO DỮ LIỆU MẶT 1–5 KÈM THỜI GIAN HỌC & BẢNG ĐIỂM CÁ NHÂN]`;
+    triggerDownload(content, 'text/plain', `Bao_Cao_Nhip_1_${cls}_${name}.txt`);
+    const st = document.getElementById('export-status-msg');
+    if (st) {
+      st.style.display = 'block';
+      st.style.color = 'var(--positive)';
+      st.textContent = `✓ Đã xuất Báo cáo Nhịp 1 kèm Thời gian học & Bảng điểm Cá nhân.`;
+    }
   }
 
   function exportCompleteDossier() {
-    const st = document.getElementById(`export-status-msg`);
+    const st = document.getElementById('export-status-msg');
+    const cls = sanitizeFilenamePart(getResolvedClass());
+    const name = sanitizeFilenamePart(state.studentName);
+    const wc = countWords(state.essayText);
     const content = [
       buildPhase1Block(),
       ``,
       `[MẶT 6] TỰ ĐIỀU CHỈNH SAU PHẢN BIỆN ĐỒNG ĐẲNG 2–1:`,
       state.peer21Note || `(Chưa ghi nhận)`,
       ``,
-      `[MẶT 6] ĐOẠN VĂN NGHỊ LUẬN (~150 CHỮ):`,
+      `[MẶT 6] ĐOẠN VĂN NGHỊ LUẬN (${wc} chữ):`,
       state.essayText || `(Chưa ghi nhận bài viết)`,
       ``,
-      `Kết quả Luyện tập Mặt 6: ${Object.keys(state.practiceAnswers).length}/7 câu đã trả lời.`
-    ].join(`\n`);
-    
-    triggerDownload(content, `text/plain`, `Ho_So_Giam_Tuyen_3D_Rubich_Thi_Ca.txt`);
-    
+      `===============================================================`,
+      `Xác nhận xuất từ ứng dụng Ru-bích Thi Ca Số 3D — THPT Thạnh Lộc.`
+    ].join('\n');
+
+    triggerDownload(content, 'text/plain', `Ho_So_Giam_Tuyen_${cls}_${name}.txt`);
+
     if (st) {
-      st.style.display = `block`;
-      st.style.color = `var(--positive)`;
-      st.textContent = `✓ Đã xuất Hồ sơ Giám tuyển Hoàn chỉnh (.txt) cả 6 mặt!`;
+      st.style.display = 'block';
+      st.style.color = 'var(--positive)';
+      st.textContent = `✓ Đã xuất Hồ sơ Giám tuyển Hoàn chỉnh (Nội dung 6 mặt + Thời gian học + Bảng điểm Cá nhân)!`;
     }
   }
 
@@ -3386,10 +3523,11 @@
     }).join(``);
 
     const sum = document.getElementById(`quiz-result-summary`);
-    if (sum) {
-      const sc = state.quizScores[ph];
-      sum.textContent = sc !== null ? `Phần A (7 câu trắc nghiệm): ${sc} / 7,0 điểm` : `Chưa chấm`;
-    }
+ if (sum) {
+   const totalMcq = currentQuiz.filter(function (q) { return q.type === 'mcq'; }).length;
+   const sc = state.quizScores[ph];
+   sum.textContent = sc !== null ? `Phần A (${totalMcq} câu trắc nghiệm): ${sc} / ${totalMcq} câu đúng` : `Chưa chấm`;
+ }
   }
 
   function selectQuizAns(qid, val) {
@@ -3402,19 +3540,23 @@
     persistState();
   }
 
-  function gradeAssessmentQuiz() {
-    const ph = state.assessPhase;
-    const ansMap = state.quizAnswers[ph] || {};
-    let correct = 0;
-    const currentQuiz = ph === 'pre' ? PRE_TEST_QS : POST_TEST_QS;
-    currentQuiz.forEach(function (q) {
-      if (q.type === `mcq` && ansMap[q.id] === q.ans) correct++;
-    });
-    state.quizScores[ph] = correct;
-    const sum = document.getElementById(`quiz-result-summary`);
-    if (sum) sum.textContent = `✓ Phần A (${ph.toUpperCase()}): ${correct}.0 / 7,0 điểm (Phần B tự luận 3,0đ đã lưu)`;
-    persistState();
-  }
+function gradeAssessmentQuiz() {
+ const ph = state.assessPhase;
+ const ansMap = state.quizAnswers[ph] || {};
+ let correct = 0;
+ let totalMcq = 0;
+ const currentQuiz = ph === 'pre' ? PRE_TEST_QS : POST_TEST_QS;
+ currentQuiz.forEach(function (q) {
+   if (q.type === 'mcq') {
+     totalMcq++;
+     if (ansMap[q.id] === q.ans) correct++;
+   }
+ });
+ state.quizScores[ph] = correct;
+ const sum = document.getElementById(`quiz-result-summary`);
+ if (sum) sum.textContent = `✓ Phần A (${ph.toUpperCase()}): ${correct} / ${totalMcq} câu đúng (Phần B tự luận đã lưu)`;
+ persistState();
+}
 
   function renderRubric() {
     const box = document.getElementById(`rubric-criteria-list`);
@@ -3449,13 +3591,19 @@
   }
 
   function build32StudentRows() {
-    const rubricTotal = Object.values(state.rubricScores).reduce(function (a, b) { return a + b; }, 0);
+    const rubricTotal = Object.values(state.rubricScores).reduce(function (a, b) { return a + (b || 0); }, 0);
+    const pre = computeQuizAutoScore('pre');
+    const post = computeQuizAutoScore('post');
+    const m6 = computeM6PracticeScore();
+    const studied = state.studiedSeconds || (5400 - (state.timerSeconds || 5400));
     return [{
-      stt: parseInt(state.studentStt, 10) || 1,
+      stt: state.studentStt || '01',
       name: state.studentName || '(Chưa nhập tên)',
       cls: getResolvedClass(),
-      preA: state.quizScores.pre !== null ? state.quizScores.pre : 'Chưa làm',
-      postA: state.quizScores.post !== null ? state.quizScores.post : 'Chưa làm',
+      studiedText: formatDurationVi(studied),
+      preA: pre.answered > 0 ? `${pre.correct}/${pre.totalMcq}` : 'Chưa làm',
+      m6Score: `${m6.correct}/${m6.total}`,
+      postA: post.answered > 0 ? `${post.correct}/${post.totalMcq}` : 'Chưa làm',
       rubric: rubricTotal
     }];
   }
@@ -3466,21 +3614,23 @@
     const rows = build32StudentRows();
     box.innerHTML = `
       <table class="data-table">
-        <thead><tr><th>STT</th><th>Họ và tên</th><th>Lớp</th><th>Pre-test (A)</th><th>Post-test (A)</th><th>Điểm Rubric</th></tr></thead>
+        <thead><tr><th>Mã HS/STT</th><th>Họ và tên</th><th>Lớp</th><th>Thời gian học</th><th>Pre-test</th><th>Luyện tập M6</th><th>Post-test</th><th>Rubric</th></tr></thead>
         <tbody>${rows.map(function (r) {
-          return `<tr><td>${String(r.stt).padStart(2, `0`)}</td><td>${r.name}</td><td>${r.cls}</td><td>${r.preA}</td><td>${r.postA}</td><td><strong style="color:var(--primary);">${r.rubric}/100</strong></td></tr>`;
-        }).join(``)}</tbody>
+          return `<tr><td>${String(r.stt).padStart(2, '0')}</td><td>${r.name}</td><td>${r.cls}</td><td>${r.studiedText}</td><td>${r.preA}</td><td>${r.m6Score}</td><td>${r.postA}</td><td><strong style="color:var(--primary);">${r.rubric}/100</strong></td></tr>`;
+        }).join('')}</tbody>
       </table>
     `;
   }
 
   function exportClassCSV32() {
     const rows = build32StudentRows();
-    const header = `STT,Ho_va_ten,Lop,Diem_Pre_test,Diem_Post_test,Diem_Rubric_100`;
+    const header = `Ma_HS_STT,Ho_va_ten,Lop,Thoi_gian_thuc_hoc,Pre_test,Luyen_tap_M6,Post_test,Diem_Rubric_100`;
     const body = rows.map(function (r) {
-      return `${r.stt},"${r.name}","${r.cls}",${r.preA},${r.postA},${r.rubric}`;
-    }).join(`\n`);
-    triggerDownload(`\uFEFF` + header + `\n` + body, `text/csv`, `Bang_Diem_Ca_Nhan_${state.studentName || 'HS'}.csv`);
+      return `"${r.stt}","${r.name}","${r.cls}","${r.studiedText}","${r.preA}","${r.m6Score}","${r.postA}",${r.rubric}`;
+    }).join('\n');
+    const cls = sanitizeFilenamePart(getResolvedClass());
+    const name = sanitizeFilenamePart(state.studentName);
+    triggerDownload('\uFEFF' + header + '\n' + body, 'text/csv', `Bang_Diem_Ca_Nhan_${cls}_${name}.csv`);
   }
 
   function clearAllProgress(btn) {
@@ -3499,8 +3649,18 @@
     state.peer21Note = ``;
     state.classBoard = [];
     state.quizAnswers = { pre: {}, post: {} };
-    state.quizEssays = { pre: { q4: ``, q9: `` }, post: { q4: ``, q9: `` } };
+    state.quizEssays = { pre: {}, post: {} };
     state.quizScores = { pre: null, post: null };
+    state.timerRunning = false;
+    clearInterval(timerInterval);
+    state.timerSeconds = 5400;
+    state.studiedSeconds = 0;
+    state.timerResetCount = 0;
+    state.timerStartedAt = ``;
+    state.lessonEnteredAt = ``;
+    const tBtn = document.getElementById(`btn-timer-toggle`);
+    if (tBtn) tBtn.textContent = `Bắt đầu`;
+    renderTimer();
     syncAllInputsFromState();
     persistState();
   }
