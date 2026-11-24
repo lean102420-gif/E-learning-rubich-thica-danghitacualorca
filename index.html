@@ -731,7 +731,7 @@
         <button class="btn btn-sm" style="min-height: 28px; padding: 0.1rem 0.4rem;" onclick="resetStudyTimer()" title="Đặt lại 90:00">↺</button>
       </div>
 
-      <button id="btn-lorca-song" class="btn btn-sm btn-secondary" onclick="toggleLorcaSong()" title="Ca khúc phổ thơ Đàn ghi ta của Lor-ca (Thơ: Thanh Thảo – Nhạc: Hồ Thành Công | Nguồn tham khảo phi thương mại: Xuân Hùng music)">🎵 Nhạc phổ thơ</button>
+      <button id="btn-lorca-song" class="btn btn-sm btn-secondary" onclick="toggleLorcaSong()" title="Nhạc nền xuyên suốt: Ca khúc phổ thơ Đàn ghi ta của Lor-ca (Thơ: Thanh Thảo – Nhạc: Hồ Thành Công | Nguồn tham khảo phi thương mại: Xuân Hùng music). Tự tạm ngắt khi bật âm thanh và tự nổi lại khi kết thúc.">🎵 Nhạc nền thơ</button>
       <button id="btn-flamenco-solo" class="btn btn-sm btn-gold" onclick="toggleFlamencoSolo()">🎸 Độc tấu Flamenco</button>
       <button class="btn btn-sm btn-secondary" onclick="openGuideModal()">🧭 Hướng dẫn</button>
       <button class="btn btn-sm" onclick="openAssessmentModal('pre')">📝 Khảo sát &amp; Rubric</button>
@@ -931,7 +931,7 @@
                 <button id="btn-lorca-song-card" class="btn btn-sm btn-secondary" style="min-height: 28px; padding: 0.14rem 0.5rem; font-size: 0.74rem;" onclick="toggleLorcaSong()">▶ Nghe bài hát</button>
               </div>
               <div id="lorca-song-status" style="font-size: 0.71rem; color: var(--on-surface-variant); line-height: 1.35;">
-                <em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo: Xuân Hùng music · Phi thương mại phục vụ dạy học · Tự động tạm dừng khi bật phổ âm hoặc giọng đọc).
+                <em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo: Xuân Hùng music · Phi thương mại phục vụ dạy học · Phát nền xuyên suốt — tự tạm ngắt khi bật phổ âm/giọng đọc và tự nổi lên lại khi kết thúc).
               </div>
             </div>
           </div>
@@ -2396,7 +2396,8 @@
   }
 
   function triggerGuitarMotif(idx) {
-    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
+    const motifDurations = [2700, 2400, 1000, 2100, 2900];
+    if (typeof suspendLorcaSong === "function") suspendLorcaSong(motifDurations[idx] || 2200);
     const m = GUITAR_MOTIFS[idx];
     if (!m) return;
     const readout = document.getElementById(`synesthesia-readout`);
@@ -2450,7 +2451,7 @@
   }
 
   function playDanTranhPentatonic() {
-    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
+    if (typeof suspendLorcaSong === "function") suspendLorcaSong(2600);
     const ctx = ensureAudioCtx();
     if (!ctx) return;
     const scale = [293.66, 329.63, 392.00, 440.00, 523.25, 587.33];
@@ -2475,8 +2476,7 @@
     setTimeout(function () { oscAmp = 0.08; }, 1600);
   }
 
-  function stopAllAudio() {
-    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
+  function stopAllAudio(skipBgResume) {
     flamencoSoloPlaying = false;
     clearInterval(flamencoTimer);
     const soloBtn = document.getElementById(`btn-flamenco-solo`);
@@ -2486,15 +2486,18 @@
     });
     activeAudioNodes = [];
     oscAmp = 0.08;
+    if (!skipBgResume && typeof resumeLorcaSongIfEnabled === "function") {
+      resumeLorcaSongIfEnabled(350);
+    }
   }
 
   function toggleFlamencoSolo() {
     const btn = document.getElementById(`btn-flamenco-solo`);
     if (flamencoSoloPlaying) {
-      stopAllAudio();
+      stopAllAudio(false);
       return;
     }
-    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
+    if (typeof suspendLorcaSong === "function") suspendLorcaSong(0);
     flamencoSoloPlaying = true;
     if (btn) btn.textContent = `⏹ Dừng Độc tấu`;
     function playPhrase() {
@@ -2508,7 +2511,12 @@
         playNylonString(f, t + 0.35 + i * 0.24, 0.9, 0.14, false);
       });
     }
-    playPhrase();
+    const actx = ensureAudioCtx();
+    if (actx && actx.state === `suspended` && typeof actx.resume === `function`) {
+      actx.resume().then(playPhrase).catch(playPhrase);
+    } else {
+      playPhrase();
+    }
     flamencoTimer = setInterval(playPhrase, 3100);
   }
 
@@ -2784,20 +2792,28 @@
     return segs;
   }
 
-  function stopVietnameseTTS() {
+  function stopVietnameseTTS(skipBgResume) {
     clearInterval(karaokeTimer);
-    if (`speechSynthesis` in window) window.speechSynthesis.cancel();
+    karaokeTimer = null;
+    try { if (`speechSynthesis` in window) window.speechSynthesis.cancel(); } catch (e) {}
     [`audio-bieutuong-1`, `audio-bieutuong-2`, `audio-bieutuong-3`, `audio-bieutuong-4`].forEach(function (id) {
-      const a = document.getElementById(id);
-      if (a) { a.pause(); a.currentTime = 0; }
+      try {
+        const a = document.getElementById(id);
+        if (a) {
+          a.pause();
+          if (a.readyState > 0) a.currentTime = 0;
+        }
+      } catch (e) {}
     });
     if (currentMp3Audio) {
-      currentMp3Audio.pause();
-      currentMp3Audio.currentTime = 0;
+      try {
+        currentMp3Audio.pause();
+        if (currentMp3Audio.readyState > 0) currentMp3Audio.currentTime = 0;
+      } catch (e) {}
       currentMp3Audio = null;
     }
     if (typeof flamencoSoloPlaying !== `undefined` && flamencoSoloPlaying) {
-      stopAllAudio();
+      stopAllAudio(true);
     }
     ttsPaused = false;
     const pb = document.getElementById(`btn-tts-pause`);
@@ -2806,12 +2822,16 @@
     if (fill) fill.style.width = `0%`;
     const st = document.getElementById(`tts-status`);
     if (st) st.textContent = `Đã dừng đọc thuyết minh.`;
+    if (!skipBgResume && typeof resumeLorcaSongIfEnabled === "function") {
+      resumeLorcaSongIfEnabled(350);
+    }
   }
 
   function togglePauseTTS() {
     const pb = document.getElementById(`btn-tts-pause`);
     if (currentMp3Audio) {
       if (currentMp3Audio.paused) {
+        if (typeof suspendLorcaSong === "function") suspendLorcaSong(0);
         currentMp3Audio.play().catch(function () {});
         if (currentMp3Audio.id && currentMp3Audio.id.indexOf(`audio-bieutuong-`) === 0 && !flamencoSoloPlaying) {
           toggleFlamencoSolo();
@@ -2819,12 +2839,18 @@
         ttsPaused = false;
       } else {
         currentMp3Audio.pause();
-        if (flamencoSoloPlaying) stopAllAudio();
+        if (flamencoSoloPlaying) stopAllAudio(true);
         ttsPaused = true;
       }
     } else if (`speechSynthesis` in window && window.speechSynthesis.speaking) {
-      if (ttsPaused) { window.speechSynthesis.resume(); ttsPaused = false; }
-      else { window.speechSynthesis.pause(); ttsPaused = true; }
+      if (ttsPaused) {
+        if (typeof suspendLorcaSong === "function") suspendLorcaSong(0);
+        window.speechSynthesis.resume();
+        ttsPaused = false;
+      } else {
+        window.speechSynthesis.pause();
+        ttsPaused = true;
+      }
     }
     if (pb) pb.textContent = ttsPaused ? `▶ Tiếp tục` : `⏸ Tạm dừng`;
   }
@@ -2834,9 +2860,9 @@
   }
 
   function speakSymbol(cardNum) {
-    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
+    if (typeof suspendLorcaSong === "function") suspendLorcaSong(0);
     lastTtsCard = cardNum;
-    stopVietnameseTTS();
+    stopVietnameseTTS(true);
     const text = TTS_SCRIPTS[cardNum];
     if (!text) return;
 
@@ -2860,8 +2886,10 @@
         }
       };
       audio.onended = function () {
+        currentMp3Audio = null;
         if (fill) fill.style.width = `100%`;
         if (status) status.textContent = `✓ Đã đọc xong Thẻ 0${cardNum} (MP3 chuẩn Tiếng Việt).`;
+        if (typeof resumeLorcaSongIfEnabled === "function") resumeLorcaSongIfEnabled(450);
       };
       audio.play().catch(function () {});
       if (status) status.textContent = `🔊 Đang phát MP3 thuyết minh Tiếng Việt — Thẻ 0${cardNum}`;
@@ -2874,8 +2902,10 @@
       let idx = 0;
       function playNextGoogleSeg() {
         if (idx >= segs.length) {
+          currentMp3Audio = null;
           if (fill) fill.style.width = `100%`;
           if (status) status.textContent = `✓ Hoàn tất đọc Thẻ 0${cardNum} (Giọng Google Tiếng Việt).`;
+          if (typeof resumeLorcaSongIfEnabled === "function") resumeLorcaSongIfEnabled(450);
           return;
         }
         renderKaraokeSegments(text, idx);
@@ -2915,6 +2945,7 @@
         if (idx >= segs.length) {
           if (fill) fill.style.width = `100%`;
           if (status) status.textContent = `✓ Hoàn tất đọc Thẻ 0${cardNum} (${chosenVoice.name}).`;
+          if (typeof resumeLorcaSongIfEnabled === "function") resumeLorcaSongIfEnabled(450);
           return;
         }
         renderKaraokeSegments(text, idx);
@@ -2945,8 +2976,10 @@
       step++;
       if (step >= segs.length) {
         clearInterval(karaokeTimer);
+        karaokeTimer = null;
         if (fill) fill.style.width = `100%`;
         if (status) status.textContent = `✓ Đã hiển thị xong lời thuyết minh Thẻ 0${cardNum}.`;
+        if (typeof resumeLorcaSongIfEnabled === "function") resumeLorcaSongIfEnabled(450);
         return;
       }
       renderKaraokeSegments(text, step);
@@ -3774,10 +3807,10 @@ function gradeAssessmentQuiz() {
 
   document.addEventListener(`DOMContentLoaded`, initApp);
 function phatAmThanhBieuTuong(idAmThanh) {
-    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
+    if (typeof suspendLorcaSong === "function") suspendLorcaSong(0);
     const cardNum = parseInt(String(idAmThanh).replace(/\D/g, ''), 10) || 1;
     lastTtsCard = cardNum;
-    stopVietnameseTTS();
+    stopVietnameseTTS(true);
 
     const audioCanPhat = document.getElementById(idAmThanh);
     const status = document.getElementById('tts-status');
@@ -3810,14 +3843,17 @@ function phatAmThanhBieuTuong(idAmThanh) {
         if (status) status.textContent = `✓ Đã phát xong giọng đọc diễn cảm — Thẻ 0${cardNum}.`;
         currentMp3Audio = null;
         if (typeof flamencoSoloPlaying !== 'undefined' && flamencoSoloPlaying) {
-            stopAllAudio();
+            stopAllAudio(true);
+        }
+        if (typeof resumeLorcaSongIfEnabled === 'function') {
+            resumeLorcaSongIfEnabled(450);
         }
     };
 
     audioCanPhat.onerror = function () {
         currentMp3Audio = null;
         if (typeof flamencoSoloPlaying !== 'undefined' && flamencoSoloPlaying) {
-            stopAllAudio();
+            stopAllAudio(true);
         }
         speakSymbol(cardNum);
     };
@@ -3832,7 +3868,7 @@ function phatAmThanhBieuTuong(idAmThanh) {
         playPromise.catch(function () {
             currentMp3Audio = null;
             if (typeof flamencoSoloPlaying !== 'undefined' && flamencoSoloPlaying) {
-                stopAllAudio();
+                stopAllAudio(true);
             }
             speakSymbol(cardNum);
         });
@@ -3844,63 +3880,217 @@ function phatAmThanhBieuTuong(idAmThanh) {
 <audio id="audio-bieutuong-3" src="doc-bieu-tuong-3.mp3"></audio>
 <audio id="audio-bieutuong-4" src="doc-bieu-tuong-4.mp3"></audio>
 <!-- Ca khúc phổ thơ Đàn ghi ta của Lor-ca (Thơ: Thanh Thảo – Nhạc: Hồ Thành Công | Nguồn tham khảo phi thương mại: Xuân Hùng music) -->
-<audio id="audio-nhac-pho-tho" src="nhac-pho-tho-lorca.m4a" preload="metadata"></audio>
+<audio id="audio-nhac-pho-tho" src="nhac-pho-tho-lorca.mp4" loop preload="auto" playsinline></audio>
 <script>
-  function syncLorcaSongUI(isPlaying, customMsg) {
+  let lorcaBgEnabled = false;
+  let lorcaResumeTimer = null;
+  let lorcaFadeTimer = null;
+  let lorcaSourceIdx = 0;
+  const LORCA_SONG_SOURCES = ['nhac-pho-tho-lorca.mp4', 'nhac-pho-tho-lorca.m4a'];
+  const LORCA_BG_TARGET_VOL = 0.65;
+  const LORCA_CITATION_DEFAULT = '<em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo: Xuân Hùng music · Phi thương mại phục vụ dạy học · Phát nền xuyên suốt — tự tạm ngắt khi bật phổ âm/giọng đọc và tự nổi lên lại khi kết thúc).';
+
+  function clearLorcaTimers() {
+    if (lorcaResumeTimer) { clearTimeout(lorcaResumeTimer); lorcaResumeTimer = null; }
+    if (lorcaFadeTimer) { clearInterval(lorcaFadeTimer); lorcaFadeTimer = null; }
+  }
+
+  function isOtherAudioActive() {
+    if (typeof flamencoSoloPlaying !== 'undefined' && flamencoSoloPlaying) return true;
+    if (typeof currentMp3Audio !== 'undefined' && currentMp3Audio && !currentMp3Audio.paused) return true;
+    try {
+      if ('speechSynthesis' in window && window.speechSynthesis.speaking && !ttsPaused) return true;
+    } catch (e) {}
+    if (typeof karaokeTimer !== 'undefined' && karaokeTimer) return true;
+    return false;
+  }
+
+  function syncLorcaSongUI(mode, customMsg) {
+    /* mode: 'playing' | 'suspended' | 'off' */
     const hudBtn = document.getElementById('btn-lorca-song');
     const cardBtn = document.getElementById('btn-lorca-song-card');
     const st = document.getElementById('lorca-song-status');
     if (hudBtn) {
-      hudBtn.textContent = isPlaying ? '⏸ Tạm dừng Nhạc thơ' : '🎵 Nhạc phổ thơ';
-      hudBtn.classList.toggle('btn-primary', isPlaying);
-      hudBtn.classList.toggle('btn-secondary', !isPlaying);
+      if (mode === 'playing') {
+        hudBtn.textContent = '⏸ Tắt Nhạc nền';
+        hudBtn.classList.add('btn-primary');
+        hudBtn.classList.remove('btn-secondary', 'btn-gold');
+      } else if (mode === 'suspended') {
+        hudBtn.textContent = '🎵 Nhạc nền (tạm nhường)';
+        hudBtn.classList.add('btn-gold');
+        hudBtn.classList.remove('btn-primary', 'btn-secondary');
+      } else {
+        hudBtn.textContent = '🎵 Nhạc nền thơ';
+        hudBtn.classList.add('btn-secondary');
+        hudBtn.classList.remove('btn-primary', 'btn-gold');
+      }
     }
     if (cardBtn) {
-      cardBtn.textContent = isPlaying ? '⏸ Tạm dừng' : '▶ Nghe bài hát';
-      cardBtn.classList.toggle('btn-primary', isPlaying);
-      cardBtn.classList.toggle('btn-secondary', !isPlaying);
+      if (mode === 'playing') {
+        cardBtn.textContent = '⏸ Tắt nhạc nền';
+        cardBtn.classList.add('btn-primary');
+        cardBtn.classList.remove('btn-secondary');
+      } else if (mode === 'suspended') {
+        cardBtn.textContent = '⏸ Tắt nhạc nền';
+        cardBtn.classList.add('btn-secondary');
+        cardBtn.classList.remove('btn-primary');
+      } else {
+        cardBtn.textContent = '▶ Nghe bài hát';
+        cardBtn.classList.add('btn-secondary');
+        cardBtn.classList.remove('btn-primary');
+      }
     }
-    if (st && customMsg) {
+    if (st && customMsg !== undefined) {
       st.innerHTML = customMsg;
     }
   }
 
-  function pauseLorcaSong(resetToStart) {
+  function fadeInLorcaSong(song, targetVol, durationMs) {
+    if (lorcaFadeTimer) { clearInterval(lorcaFadeTimer); lorcaFadeTimer = null; }
+    const startVol = 0.15;
+    const steps = 12;
+    const stepMs = Math.max(30, Math.floor((durationMs || 700) / steps));
+    let curStep = 0;
+    try { song.volume = startVol; } catch (e) {}
+    lorcaFadeTimer = setInterval(function () {
+      curStep++;
+      if (!lorcaBgEnabled || song.paused) {
+        clearInterval(lorcaFadeTimer);
+        lorcaFadeTimer = null;
+        return;
+      }
+      const nextVol = Math.min(targetVol, startVol + (targetVol - startVol) * (curStep / steps));
+      try { song.volume = nextVol; } catch (e) {}
+      if (curStep >= steps) {
+        clearInterval(lorcaFadeTimer);
+        lorcaFadeTimer = null;
+      }
+    }, stepMs);
+  }
+
+  function playLorcaWithFallback(useFadeIn) {
     const song = document.getElementById('audio-nhac-pho-tho');
     if (!song) return;
-    if (!song.paused) song.pause();
-    if (resetToStart) song.currentTime = 0;
-    syncLorcaSongUI(false);
+
+    song.loop = true;
+    song.muted = false;
+    try { song.volume = useFadeIn ? 0.15 : LORCA_BG_TARGET_VOL; } catch (e) {}
+
+    function tryFallbackOrError(errDetail) {
+      if (lorcaSourceIdx + 1 < LORCA_SONG_SOURCES.length) {
+        lorcaSourceIdx++;
+        song.src = LORCA_SONG_SOURCES[lorcaSourceIdx];
+        song.load();
+        playLorcaWithFallback(useFadeIn);
+        return;
+      }
+      lorcaBgEnabled = false;
+      lorcaSourceIdx = 0;
+      clearLorcaTimers();
+      syncLorcaSongUI(
+        'off',
+        '<span style="color: var(--error); font-weight: 600;">⚠ Không nạp được tệp nhạc (nhac-pho-tho-lorca.mp4 / .m4a). Nếu cô mở trên máy tính, vui lòng giải nén toàn bộ tệp ZIP trước rồi mới mở file HTML (không bấm mở trực tiếp bên trong tệp ZIP).</span>'
+      );
+    }
+
+    song.onerror = function () {
+      if (lorcaBgEnabled) tryFallbackOrError('media-error');
+    };
+
+    const p = song.play();
+    if (p && typeof p.then === 'function') {
+      p.then(function () {
+        if (!lorcaBgEnabled) {
+          song.pause();
+          return;
+        }
+        if (useFadeIn) {
+          fadeInLorcaSong(song, LORCA_BG_TARGET_VOL, 750);
+        } else {
+          try { song.volume = LORCA_BG_TARGET_VOL; } catch (e) {}
+        }
+        syncLorcaSongUI('playing', '🔊 Đang phát nhạc nền xuyên suốt: <em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo phi thương mại: Xuân Hùng music).');
+      }).catch(function (err) {
+        tryFallbackOrError(err && err.name ? err.name : 'play-rejected');
+      });
+    } else {
+      syncLorcaSongUI('playing', '🔊 Đang phát nhạc nền xuyên suốt: <em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo phi thương mại: Xuân Hùng music).');
+    }
+  }
+
+  /* Tạm nhường cho âm thanh tương tác (phím đàn, Đàn tranh, giọng cô An) mà vẫn giữ chế độ nhạc nền */
+  function suspendLorcaSong(autoResumeAfterMs) {
+    const song = document.getElementById('audio-nhac-pho-tho');
+    clearLorcaTimers();
+    if (song && !song.paused) {
+      try { song.pause(); } catch (e) {}
+    }
+    if (lorcaBgEnabled) {
+      syncLorcaSongUI('suspended', '⏸ Nhạc nền đang tạm nhường cho âm thanh học liệu — sẽ tự nổi lên lại ngay khi kết thúc.');
+      if (autoResumeAfterMs && autoResumeAfterMs > 0) {
+        lorcaResumeTimer = setTimeout(function () {
+          lorcaResumeTimer = null;
+          resumeLorcaSongIfEnabled(0);
+        }, autoResumeAfterMs);
+      }
+    }
+  }
+
+  /* Tự động nổi lại mượt mà sau khi âm thanh tương tác kết thúc */
+  function resumeLorcaSongIfEnabled(delayMs) {
+    if (!lorcaBgEnabled) return;
+    if (lorcaResumeTimer) { clearTimeout(lorcaResumeTimer); lorcaResumeTimer = null; }
+    const wait = (typeof delayMs === 'number' && delayMs > 0) ? delayMs : 0;
+    const doResume = function () {
+      if (!lorcaBgEnabled || isOtherAudioActive()) return;
+      const song = document.getElementById('audio-nhac-pho-tho');
+      if (!song) return;
+      if (!song.paused) return;
+      playLorcaWithFallback(true);
+    };
+    if (wait > 0) {
+      lorcaResumeTimer = setTimeout(function () {
+        lorcaResumeTimer = null;
+        doResume();
+      }, wait);
+    } else {
+      doResume();
+    }
+  }
+
+  /* Tắt hẳn chế độ nhạc nền khi người dùng chủ động bấm tắt */
+  function pauseLorcaSong(resetToStart) {
+    lorcaBgEnabled = false;
+    clearLorcaTimers();
+    const song = document.getElementById('audio-nhac-pho-tho');
+    if (song) {
+      try {
+        if (!song.paused) song.pause();
+        if (resetToStart && song.readyState > 0) song.currentTime = 0;
+      } catch (e) {}
+    }
+    syncLorcaSongUI('off', LORCA_CITATION_DEFAULT);
   }
 
   function toggleLorcaSong() {
     const song = document.getElementById('audio-nhac-pho-tho');
     if (!song) return;
-    if (!song.paused) {
+    if (lorcaBgEnabled) {
       pauseLorcaSong(false);
       return;
     }
-    if (typeof ensureAudioCtx === 'function') ensureAudioCtx();
-    if (typeof stopVietnameseTTS === 'function') stopVietnameseTTS();
-    if (typeof stopAllAudio === 'function') stopAllAudio();
+    try { if (typeof ensureAudioCtx === 'function') ensureAudioCtx(); } catch (e) {}
+    try { if (typeof stopVietnameseTTS === 'function') stopVietnameseTTS(true); } catch (e) {}
+    try { if (typeof stopAllAudio === 'function') stopAllAudio(true); } catch (e) {}
 
-    song.volume = 0.55;
-    song.onended = function () {
-      pauseLorcaSong(true);
-    };
-    song.onerror = function () {
-      syncLorcaSongUI(false, '<span style="color: var(--error);">Không tìm thấy tệp <strong>nhac-pho-tho-lorca.m4a</strong> cùng thư mục với Web App.</span>');
-    };
-    const p = song.play();
-    if (p && typeof p.then === 'function') {
-      p.then(function () {
-        syncLorcaSongUI(true, '🔊 Đang phát <em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo phi thương mại: Xuân Hùng music).');
-      }).catch(function () {
-        syncLorcaSongUI(false);
-      });
-    } else {
-      syncLorcaSongUI(true);
+    lorcaBgEnabled = true;
+    clearLorcaTimers();
+    /* Đảm bảo bắt đầu từ nguồn đang hoạt động tốt */
+    if (!song.getAttribute('src')) {
+      lorcaSourceIdx = 0;
+      song.src = LORCA_SONG_SOURCES[0];
     }
+    playLorcaWithFallback(false);
   }
 </script>
 </body>
