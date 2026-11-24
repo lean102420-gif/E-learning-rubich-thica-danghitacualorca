@@ -731,6 +731,7 @@
         <button class="btn btn-sm" style="min-height: 28px; padding: 0.1rem 0.4rem;" onclick="resetStudyTimer()" title="Đặt lại 90:00">↺</button>
       </div>
 
+      <button id="btn-lorca-song" class="btn btn-sm btn-secondary" onclick="toggleLorcaSong()" title="Ca khúc phổ thơ Đàn ghi ta của Lor-ca (Thơ: Thanh Thảo – Nhạc: Hồ Thành Công | Nguồn tham khảo phi thương mại: Xuân Hùng music)">🎵 Nhạc phổ thơ</button>
       <button id="btn-flamenco-solo" class="btn btn-sm btn-gold" onclick="toggleFlamencoSolo()">🎸 Độc tấu Flamenco</button>
       <button class="btn btn-sm btn-secondary" onclick="openGuideModal()">🧭 Hướng dẫn</button>
       <button class="btn btn-sm" onclick="openAssessmentModal('pre')">📝 Khảo sát &amp; Rubric</button>
@@ -923,6 +924,15 @@
             </div>
             <div id="progress-checklist" style="margin-top: 0.5rem; font-size: 0.82rem; font-weight: 700; color: var(--primary);">
               Tiến độ hồ sơ: 0/6 nhiệm vụ chính đã hoàn tất
+            </div>
+            <div style="margin-top: 0.55rem; padding-top: 0.45rem; border-top: 1px solid rgba(224, 159, 62, 0.28); display: flex; flex-direction: column; gap: 0.28rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--secondary);">🎵 Ca khúc phổ thơ cảm hứng học tập</span>
+                <button id="btn-lorca-song-card" class="btn btn-sm btn-secondary" style="min-height: 28px; padding: 0.14rem 0.5rem; font-size: 0.74rem;" onclick="toggleLorcaSong()">▶ Nghe bài hát</button>
+              </div>
+              <div id="lorca-song-status" style="font-size: 0.71rem; color: var(--on-surface-variant); line-height: 1.35;">
+                <em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo: Xuân Hùng music · Phi thương mại phục vụ dạy học · Tự động tạm dừng khi bật phổ âm hoặc giọng đọc).
+              </div>
             </div>
           </div>
         </div>
@@ -2386,6 +2396,7 @@
   }
 
   function triggerGuitarMotif(idx) {
+    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
     const m = GUITAR_MOTIFS[idx];
     if (!m) return;
     const readout = document.getElementById(`synesthesia-readout`);
@@ -2439,6 +2450,7 @@
   }
 
   function playDanTranhPentatonic() {
+    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
     const ctx = ensureAudioCtx();
     if (!ctx) return;
     const scale = [293.66, 329.63, 392.00, 440.00, 523.25, 587.33];
@@ -2464,6 +2476,7 @@
   }
 
   function stopAllAudio() {
+    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
     flamencoSoloPlaying = false;
     clearInterval(flamencoTimer);
     const soloBtn = document.getElementById(`btn-flamenco-solo`);
@@ -2481,6 +2494,7 @@
       stopAllAudio();
       return;
     }
+    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
     flamencoSoloPlaying = true;
     if (btn) btn.textContent = `⏹ Dừng Độc tấu`;
     function playPhrase() {
@@ -2820,6 +2834,7 @@
   }
 
   function speakSymbol(cardNum) {
+    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
     lastTtsCard = cardNum;
     stopVietnameseTTS();
     const text = TTS_SCRIPTS[cardNum];
@@ -3759,6 +3774,7 @@ function gradeAssessmentQuiz() {
 
   document.addEventListener(`DOMContentLoaded`, initApp);
 function phatAmThanhBieuTuong(idAmThanh) {
+    if (typeof pauseLorcaSong === "function") pauseLorcaSong(false);
     const cardNum = parseInt(String(idAmThanh).replace(/\D/g, ''), 10) || 1;
     lastTtsCard = cardNum;
     stopVietnameseTTS();
@@ -3826,5 +3842,66 @@ function phatAmThanhBieuTuong(idAmThanh) {
 <audio id="audio-bieutuong-1" src="doc-bieu-tuong-1.mp3"></audio>
 <audio id="audio-bieutuong-2" src="doc-bieu-tuong-2.mp3"></audio>
 <audio id="audio-bieutuong-3" src="doc-bieu-tuong-3.mp3"></audio>
-<audio id="audio-bieutuong-4" src="doc-bieu-tuong-4.mp3"></audio></body>
+<audio id="audio-bieutuong-4" src="doc-bieu-tuong-4.mp3"></audio>
+<!-- Ca khúc phổ thơ Đàn ghi ta của Lor-ca (Thơ: Thanh Thảo – Nhạc: Hồ Thành Công | Nguồn tham khảo phi thương mại: Xuân Hùng music) -->
+<audio id="audio-nhac-pho-tho" src="nhac-pho-tho-lorca.m4a" preload="metadata"></audio>
+<script>
+  function syncLorcaSongUI(isPlaying, customMsg) {
+    const hudBtn = document.getElementById('btn-lorca-song');
+    const cardBtn = document.getElementById('btn-lorca-song-card');
+    const st = document.getElementById('lorca-song-status');
+    if (hudBtn) {
+      hudBtn.textContent = isPlaying ? '⏸ Tạm dừng Nhạc thơ' : '🎵 Nhạc phổ thơ';
+      hudBtn.classList.toggle('btn-primary', isPlaying);
+      hudBtn.classList.toggle('btn-secondary', !isPlaying);
+    }
+    if (cardBtn) {
+      cardBtn.textContent = isPlaying ? '⏸ Tạm dừng' : '▶ Nghe bài hát';
+      cardBtn.classList.toggle('btn-primary', isPlaying);
+      cardBtn.classList.toggle('btn-secondary', !isPlaying);
+    }
+    if (st && customMsg) {
+      st.innerHTML = customMsg;
+    }
+  }
+
+  function pauseLorcaSong(resetToStart) {
+    const song = document.getElementById('audio-nhac-pho-tho');
+    if (!song) return;
+    if (!song.paused) song.pause();
+    if (resetToStart) song.currentTime = 0;
+    syncLorcaSongUI(false);
+  }
+
+  function toggleLorcaSong() {
+    const song = document.getElementById('audio-nhac-pho-tho');
+    if (!song) return;
+    if (!song.paused) {
+      pauseLorcaSong(false);
+      return;
+    }
+    if (typeof ensureAudioCtx === 'function') ensureAudioCtx();
+    if (typeof stopVietnameseTTS === 'function') stopVietnameseTTS();
+    if (typeof stopAllAudio === 'function') stopAllAudio();
+
+    song.volume = 0.55;
+    song.onended = function () {
+      pauseLorcaSong(true);
+    };
+    song.onerror = function () {
+      syncLorcaSongUI(false, '<span style="color: var(--error);">Không tìm thấy tệp <strong>nhac-pho-tho-lorca.m4a</strong> cùng thư mục với Web App.</span>');
+    };
+    const p = song.play();
+    if (p && typeof p.then === 'function') {
+      p.then(function () {
+        syncLorcaSongUI(true, '🔊 Đang phát <em>“Đàn ghi ta của Lor-ca”</em> — Thơ: Thanh Thảo · Phổ nhạc: Hồ Thành Công (Nguồn tham khảo phi thương mại: Xuân Hùng music).');
+      }).catch(function () {
+        syncLorcaSongUI(false);
+      });
+    } else {
+      syncLorcaSongUI(true);
+    }
+  }
+</script>
+</body>
 </html>
